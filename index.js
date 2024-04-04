@@ -27,7 +27,7 @@ function askCommand() {
                 if (productId) {
                     addToCart(productId);
                 } else {
-                    console.log('Invalid product ID.');
+                    console.log('ไม่พบสินค้าในตะกร้า');
                     askCommand();
                 }
                 break;
@@ -35,7 +35,7 @@ function askCommand() {
                 if (productId) {
                     removeFromCart(productId);
                 } else {
-                    console.log('Invalid product ID.');
+                    console.log('ไม่พบสินค้าในตะกร้า');
                     askCommand();
                 }
                 break;
@@ -47,7 +47,7 @@ function askCommand() {
                 //     rl.close();
                 //     break;
             default:
-                console.log('Invalid command.');
+                console.log('คำสั่งไม่ถูกต้อง');
                 askCommand();
                 break;
         }
