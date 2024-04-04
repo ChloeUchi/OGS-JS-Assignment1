@@ -1,145 +1,172 @@
-const { rejects } = require('node:assert');
-const readline = require('node:readline');
+const readline = require('readline');
 const fs = require('fs');
-const Table = require('cli-table');
 
 const rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout,
 });
 
-const { resolve } = require("styled-jsx/css");
+let shoppingCart = {}; // Object to store items in the shopping cart
 
-async function main() {
-    try {
-        let value = new Promise((resolve, reject) => {
-            rl.question('กรุณาพิมพ์คำสั่ง(ดูรายการสินค้า,ดูประเภทสินค้า,เพิ่มสินค้าในตะกร้า,ลบสินค้าในตะกร้า,แสดงสินค้าในตะกร้า): ', (input) => {
-                const [command, product_id] = input.split(' ');
-                if (input === "ดูรายการสินค้า") {
-                    fs.readFile('data.json', 'utf8', (err, data) => {
-                        if (err) {
-                            console.error('Error reading file:', err);
-                            return;
-                        }
-
-                        try {
-                            // Parse JSON data
-                            const jsonData = JSON.parse(data);
-
-                            console.table(jsonData, ['name', 'price', 'category', 'quantity', 'product_id', 'balance']);
-                        } catch (error) {
-                            console.error('Error parsing JSON:', error);
-                        }
-                    });
-                    resolve(input);
-                } else if (input === "ดูประเภทสินค้า") {
-                    fs.readFile('data.json', 'utf8', (err, data) => {
-                        if (err) {
-                            console.error('Error reading file:', err);
-                            return;
-                        }
-
-                        try {
-                            const jsonData = JSON.parse(data);
-                            // Create an object to store counts of each value
-                            const categoryCounts = {};
-
-                            // Iterate through the array and count occurrences of each value
-                            jsonData.forEach(item => {
-                                const category = item.category; // Change this to the property you want to check for duplicates
-                                categoryCounts[category] = (categoryCounts[category] || 0) + 1;
-                            });
-                            // const duplicates = Object.keys(categoryCounts).filter(key => categoryCounts[key] > 1);
-                            const duplicateCounts = Object.keys(categoryCounts).map(category => ({ category, amount: categoryCounts[category] }));
-                            console.table(duplicateCounts);
-                        } catch (error) {
-                            console.error('Error parsing JSON:', error);
-                        }
-                    });
-                    resolve(input);
-                } else if (command === "เพิ่มสินค้าในตะกร้า" && product_id) {
-                    fs.readFile('data.json', 'utf8', (err, data) => {
-                        if (err) {
-                            console.error('Error reading file:', err);
-                            rl.close();
-                            return;
-                        }
-
-                        try {
-                            const jsonData = JSON.parse(data);
-                            const item = jsonData.find(item => product_id === product_id);
-                            if (item) {
-                                // Perform the logic to add item to the cart
-                                console.log(`Added item with ID ${product_id} to the cart.`);
-                            } else {
-                                console.log('ไม่พบรหัสสินค้า:', product_id);
-                            }
-                        } catch (error) {
-                            console.error('Error parsing JSON:', error);
-                        }
-
-                        rl.close();
-                    });
-                } else {
-                    reject("Error");
-                }
-                rl.close();
-            });
-        });
-
-        // console.log($ { value });
-    } catch (e) {
-        console.log(e);
-    }
+function main() {
+    askCommand();
 }
-main()
 
-// const fs = require('fs');
+function askCommand() {
+    rl.question('กรุณาพิมพ์คำสั่ง(ดูรายการสินค้า,ดูประเภทสินค้า,เพิ่มสินค้าในตะกร้า,ลบสินค้าในตะกร้า,แสดงสินค้าในตะกร้า): ', (input) => {
+        const [command, productId] = input.split(' ');
 
-// Read the JSON file
-// fs.readFile('data.json', 'utf8', (err, data) => {
-//     if (err) {
-//         console.error('Error reading file:', err);
-//         return;
-//     }
+        switch (command) {
+            case 'ดูรายการสินค้า':
+                viewProducts();
+                break;
+            case 'ดูประเภทสินค้า':
+                viewCategories();
+                break;
+            case 'เพิ่มสินค้าในตะกร้า':
+                if (productId) {
+                    addToCart(productId);
+                } else {
+                    console.log('Invalid product ID.');
+                    askCommand();
+                }
+                break;
+            case 'ลบสินค้าในตะกร้า':
+                if (productId) {
+                    removeFromCart(productId);
+                } else {
+                    console.log('Invalid product ID.');
+                    askCommand();
+                }
+                break;
+            case 'แสดงสินค้าในตะกร้า':
+                viewCart();
+                break;
+                // case 'exit':
+                //     console.log('Exiting program...');
+                //     rl.close();
+                //     break;
+            default:
+                console.log('Invalid command.');
+                askCommand();
+                break;
+        }
+    });
+}
 
-//     try {
-//         // Parse JSON data
-//         const jsonData = JSON.parse(data);
+function viewProducts() {
+    fs.readFile('data.json', 'utf8', (err, data) => {
+        if (err) {
+            console.error('Error reading file:', err);
+            askCommand();
+            return;
+        }
 
-//         // Display the table using console.table
-//         console.table(jsonData, ['(index)', 'name', 'price', 'category', 'quantity', 'product_id', 'balance']);
-//     } catch (error) {
-//         console.error('Error parsing JSON:', error);
-//     }
-// });
+        try {
+            const products = JSON.parse(data);
+            const productsWithBalance = products.map(product => {
+                let balance = product.quantity;
+                if (shoppingCart[product.product_id]) {
+                    balance -= shoppingCart[product.product_id].balance;
+                }
+                return {...product, balance };
+            });
+            console.table(productsWithBalance, ['name', 'price', 'category', 'quantity', 'product_id', 'balance']);
+        } catch (error) {
+            console.error('Error parsing JSON:', error);
+        }
 
-// const fs = require('fs');
-// const Table = require('cli-table');
+        askCommand();
+    });
+}
 
-// // Read the JSON file
-// fs.readFile('data.json', 'utf8', (err, data) => {
-//     if (err) {
-//         console.error('Error reading file:', err);
-//         return;
-//     }
 
-//     try {
-//         // Parse JSON data
-//         const jsonData = JSON.parse(data);
 
-//         // Create a new table
-//         const table = new Table({
-//             head: ['(index)', 'name', 'price', 'category', 'quantity', 'product_id', 'balance']
-//         });
-//         // Extract the desired data from the JSON and add it to the table
-//         jsonData.forEach(item => {
-//             table.push([item.name, item.name, item.price, item.category, item.quantity, item.product_id, item.quantity]);
-//         });
+function viewCategories() {
+    fs.readFile('data.json', 'utf8', (err, data) => {
+        if (err) {
+            console.error('Error reading file:', err);
+            askCommand();
+            return;
+        }
 
-//         // Display the table
-//         console.log(table.toString());
-//     } catch (error) {
-//         console.error('Error parsing JSON:', error);
-//     }
-// });
+        try {
+            const jsonData = JSON.parse(data);
+            const categoryCounts = {};
+
+            jsonData.forEach(item => {
+                const category = item.category;
+                categoryCounts[category] = (categoryCounts[category] || 0) + 1;
+            });
+            // const duplicates = Object.keys(categoryCounts).filter(key => categoryCounts[key] > 1);
+            const duplicateCounts = Object.keys(categoryCounts).map(category => ({ category, amount: categoryCounts[category] }));
+            console.table(duplicateCounts);
+        } catch (error) {
+            console.error('Error parsing JSON:', error);
+        }
+
+        askCommand();
+    });
+}
+
+function addToCart(productId) {
+    fs.readFile('data.json', 'utf8', (err, data) => {
+        if (err) {
+            console.error('Error reading file:', err);
+            askCommand();
+            return;
+        }
+
+        try {
+            const products = JSON.parse(data);
+            const product = products.find(product => product.product_id === productId);
+            if (product) {
+                if (!shoppingCart[productId]) {
+                    shoppingCart[productId] = {...product, balance: 1 };
+                } else {
+                    shoppingCart[productId].balance += 1;
+                }
+                console.log(`เพิ่ม ${product.name} สำเร็จ`);
+            } else {
+                console.log('ไม่พบสินค้าในตะกร้า');
+            }
+        } catch (error) {
+            console.error('Error parsing JSON:', error);
+        }
+
+        askCommand();
+    });
+}
+
+function removeFromCart(productId) {
+    if (shoppingCart[productId]) {
+        if (shoppingCart[productId].balance > 0) {
+            shoppingCart[productId].balance -= 1;
+            console.log(`ลบ ${shoppingCart[productId].name} สำเร็จ`);
+        } else {
+            console.log(`ไม่มี ${shoppingCart[productId].name} ในตะกร้า`);
+        }
+    } else {
+        console.log('ไม่พบสินค้าในตะกร้า');
+    }
+    askCommand();
+}
+
+function viewCart() {
+    const cartItems = Object.values(shoppingCart).map(item => ({
+        name: item.name,
+        price: item.price,
+        amount: item.balance,
+        all_price: item.price * item.balance
+    }));
+    cartItems.push({
+        name: 'รวม',
+        price: '',
+        amount: '',
+        all_price: cartItems.reduce((value, e) => e.all_price + value, 0)
+    })
+    console.table(cartItems, ['name', 'price', 'amount', 'all_price']);
+    askCommand();
+}
+
+main();
